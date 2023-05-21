@@ -2,12 +2,11 @@
 
 This script solves a very niche problem wherein you want to keep two mirrored directories that contain the same music tracks in different formats. One directory contains high-quality flac tracks, while the other directory contains the same tracks converted to an iPod-friendly format.
 
-*Author*: MooiMop
+**Author**: MooiMop
 
 **Version**: 1.0
 
 ## Requirements
-- ffmeg
 - pydub
 - tqdm
 
@@ -15,7 +14,7 @@ This script solves a very niche problem wherein you want to keep two mirrored di
 1. Install requirements using pip:
 
 ``` 
-pip install -r requirements.txt 
+pip install -r pydub tqdm
 ```
 
 2. Change the PATH_LOSSLESS and PATH_IPOD variables. They represent the input path and output path of directories respectively.
