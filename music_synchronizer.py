@@ -16,8 +16,8 @@ from pydub import AudioSegment
 from pydub.utils import mediainfo
 
 # Set global paths
-PATH_LOSSLESS = "./Music"
-PATH_IPOD = "./iPod"
+PATH_LOSSLESS = "./Test Music"
+PATH_IPOD = "./Test Output"
 
 
 def batch_process(list_copy, list_convert):
