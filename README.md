@@ -4,7 +4,7 @@ This script solves a very niche problem wherein you want to keep two mirrored di
 
 **Author**: MooiMop
 
-**Version**: 1.0
+**Version**: 1.1
 
 ## Requirements
 - pydub
