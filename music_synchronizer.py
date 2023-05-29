@@ -10,14 +10,14 @@ __version__ = "1.0"
 # Import libraries
 import subprocess
 import os
-import pydub
 from tqdm import tqdm
-from pydub import AudioSegment
-from pydub.utils import mediainfo
+import ffmpeg
+from joblib import Parallel, delayed
 
 # Set global paths
 PATH_LOSSLESS = "./Music"
 PATH_IPOD = "./iPod"
+WORKERS = 4
 
 
 def batch_process(list_copy, list_convert):
@@ -25,17 +25,27 @@ def batch_process(list_copy, list_convert):
     for file in pbar:
         output_file = file.replace(PATH_LOSSLESS, PATH_IPOD)
         check_directory(output_file)
-        filename = os.path.basename(file)
-        pbar.set_description(filename)
         subprocess.run(["cp", file, output_file])
-    tricky_files = []
+    
     pbar = tqdm(list_convert, desc="Converting files...")
-    for file in pbar:
-        filename = os.path.basename(file)
-        pbar.set_description(filename)
-        if not convert_to_aac(file):
-            tricky_files.append(file)
-    print(tricky_files)
+    # Parallel execution using joblib and tqdm
+    with Parallel(n_jobs=WORKERS) as parallel:
+        # Wrap the parallel execution with tqdm to track progress
+        tricky_files = parallel(delayed(convert_to_mp3)(file) for file in pbar)
+    
+    tricky_files = [x for x in tricky_files if x is not None]
+    if len(tricky_files) > 0:
+        print('These files caused errors: ')
+        print(tricky_files)
+    print('All done!')
+    
+
+    #for file in pbar:
+    #    filename = os.path.basename(file)
+    #    pbar.set_description(filename)
+    #    if not convert_to_mp3(file):
+    #        tricky_files.append(file)
+    #print(tricky_files)
 
 
 def check_directory(path):
@@ -47,68 +57,52 @@ def check_directory(path):
 def compare_dirs(main, secondary):
     list_copy = []
     list_convert = []
+
     for dirpath, dirnames, filenames in os.walk(main):
         for filename in filenames:
             file_extension = filename.split(".")[-1]
             new = os.path.join(dirpath, filename).replace(main, secondary)
 
             if not os.path.exists(new):
-                if file_extension in ["mp3", "m4a", "alac"]:
+                if file_extension in ["mp3"]:
                     list_copy.append(os.path.join(dirpath, filename))
-                elif file_extension in ["flac", "FLAC"]:
-                    if not os.path.exists(new.replace(file_extension, "m4a")):
+                elif file_extension in ["flac", "FLAC", "m4a"]:
+                    if not os.path.exists(new.replace(file_extension, "mp3")):
                         list_convert.append(os.path.join(dirpath, filename))
+
     print("Files to copy: " + str(len(list_copy)))
     print("Files to convert: " + str(len(list_convert)))
     return (list_copy, list_convert)
 
 
-def convert_to_aac(input_file):
-    file_extension = input_file.split(".")[-1]
-
+def convert_to_mp3(input_file):
     # Set file destination
-    output_file = input_file.replace(file_extension, "m4a").replace(
+    file_extension = input_file.split(".")[-1]
+    output_file = input_file.replace(file_extension, "mp3").replace(
         PATH_LOSSLESS, PATH_IPOD
     )
     check_directory(output_file)
 
-    # Get the metadata tags from the input file.
-    metadata = mediainfo(input_file).get("TAG", {})
-    if "comment" in metadata:
-        del metadata["comment"]
-
-    metadata_options = []
-    for key, value in metadata.items():
-        metadata_options.extend(["-metadata", f"{key}={value}"])
-
+    # Convert to m4a
     try:
-        # Export the AudioSegment object as a WAV file.
-        audio = AudioSegment.from_file(input_file, format=file_extension)
-        audio.export("temp.wav", format="wav", tags=metadata)
-
-        # Convert the temp file to m3a
-        subprocess.run(
-            [
-                "ffmpeg",
-                "-hide_banner",
-                "-loglevel", "error",
-                "-i", "temp.wav",
-                "-codec:a", "aac",
-                "-b:a", "320k",
-                "-ar", "44100",
-                "-ac","2",
-                "-y",
-                *metadata_options,
+        (
+            ffmpeg
+            .input(input_file)
+            .output(
                 output_file,
-            ]
+                **{
+                    'c:a': 'libmp3lame',
+                    'aq': '2',
+                    'hide_banner': None,
+                    'loglevel': 'error',
+                }
+            )
+            .overwrite_output()
+            .run()
         )
-        return True
-
-    except pydub.exceptions.CouldntEncodeError:
-        return False
-
-    except pydub.exceptions.CouldntDecodeError:
-        return False
+        return None
+    except:
+        return input_file
 
 
 copy, convert = compare_dirs(PATH_LOSSLESS, PATH_IPOD)
